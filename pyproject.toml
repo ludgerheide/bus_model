@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "bus-model"
+version = "0.1.0"
+description = ""
+authors = ["Ludger Heide <ludger.heide@tu-berlin.de>"]
+readme = "README.md"
+packages = [{ include = "busmodel" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+django = "^4.2.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
