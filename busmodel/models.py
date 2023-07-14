@@ -1,7 +1,7 @@
 from django.db import models
 
 
-class Vehicle(models.Model):
+class LudgersVehicle(models.Model):
     name = models.CharField(max_length=255)
     dummy_field_1 = models.IntegerField()
     dummy_field_2 = models.DateTimeField()
