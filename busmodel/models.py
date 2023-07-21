@@ -28,5 +28,5 @@ class VehicleType(models.Model):
     vehicle_length = models.FloatField()
 
     def __str__(self):
-        """for test only"""
-        return f'{self.vehicle_type_name}, {self.vehicle_name}'
+        """print id and name"""
+        return f'{self.vehicle_type_id}, {self.vehicle_type_name}'
