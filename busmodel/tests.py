@@ -37,4 +37,6 @@ class VehicleTestClass(TestCase):
             self.assertIsInstance(bus.vehicle_length, float)
 
         test_vehicle_model(sb)
+        print(sb)
         test_vehicle_model(ab)
+        print(ab)
