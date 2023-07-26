@@ -3,10 +3,12 @@
 """
 from django.db import models
 import numpy as np
+import math
 
 
 class ChargingCurve(models.Model):
-    """ Django model class representing charging curve according to Abb. 5.5 of Enrico's dissertation
+    """ Django model class representing charging curve
+    According to Abb. 5.5 in Enrico's dissertation and simplified
 
     Attributes:
 
@@ -14,6 +16,7 @@ class ChargingCurve(models.Model):
     soc_min: [float]
     soc_th: [float] threshold state of charge, where the charging curve changes from CC to CV
     soc_max: [float]
+    p_cc: [float] constant charging power in kW
 
 
     """
@@ -22,7 +25,6 @@ class ChargingCurve(models.Model):
     soc_th = models.FloatField()
     soc_max = models.FloatField()
     p_cc = models.FloatField()
-    p_a = models.FloatField()  # TODO: find a better name
 
 
 class VehicleClass(models.Model):
@@ -65,20 +67,42 @@ class VehicleType(models.Model):
     vehicle_length = models.FloatField()
     vehicle_class = models.ForeignKey(VehicleClass, on_delete=models.CASCADE)
 
-    @property  # TODO: add property returning charging curve
-    def charging_curve(self) -> list:
+    def charging_curve(self):
         """
         :return: pre-computed charging curve
+        A simplified charging curve of Enrico's (5.3), with charging power constant before soc_th and exponentially
+        decrease with time after reaching soc_th
         """
-        curve_matrix = np.array(2, 10)
-        return [(1, 2)]  # PLACEHOLDER
 
-    # TODO: add interpolation to charging curve according to enrico's dissertation
-    def interpolation(self):
+        soc_min = self.effective_charging_curve.soc_min
+        soc_max = self.effective_charging_curve.soc_max
+        soc_th = self.effective_charging_curve.soc_th
+        p_eff = self.effective_charging_curve.p_cc * self.charging_efficiency
+        e_eff = self.effective_capacity
+
+        t = np.linspace(0, math.ceil(e_eff * (soc_max - soc_min) / p_eff), num=21)
+        soc = []
+
+        t_th = (soc_th - soc_min) * e_eff / p_eff
+
+        for tau in t:
+            if tau <= t_th:
+                soc_tp = p_eff * tau / e_eff + soc_min
+            else:
+                soc_tp = p_eff * math.exp(t_th) * (math.exp(-t_th) - math.exp(-tau)) / e_eff + soc_th
+
+            if soc_tp > soc_max:
+                soc_tp = soc_max
+
+            soc.append(soc_tp)
+
+        return t, soc
+
+    def interpolation(self, t):
         """
             will return an soc value by interpolation
         """
-        pass
+        return np.interp(t, self.charging_curve)
 
     def __str__(self):
         """print id and name"""
