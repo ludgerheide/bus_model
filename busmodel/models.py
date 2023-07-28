@@ -8,7 +8,7 @@ import math
 
 class ChargingCurve(models.Model):
     """ Django model class representing charging curve
-    According to Abb. 5.5 in Enrico's dissertation and simplified
+    According to Abb. 5.5 and equation 5.3 in the dissertation of E. Lauth
 
     Attributes:
 
@@ -17,14 +17,25 @@ class ChargingCurve(models.Model):
     soc_th: [float] threshold state of charge, where the charging curve changes from CC to CV
     soc_max: [float]
     p_cc: [float] constant charging power in kW
+    energy_nominal: [float]
 
-
-    """
+   """
     vehicle_type = models.CharField(max_length=255)  # is it necessary?
     soc_min = models.FloatField()
     soc_th = models.FloatField()
     soc_max = models.FloatField()
     p_cc = models.FloatField()
+    energy_nominal = models.FloatField()
+
+    def get_exponential_power(self, soc):
+        """get spontaneous charging power with exponential charging curve.
+        Source: eflips.depot.processes.exponential_power() by E.Lauth"""
+
+        if soc < self.soc_th:
+            return self.p_cc
+        else:
+            return self.p_cc / 10 * (1 / self.energy_nominal - 10) / (math.exp(1) - math.exp(self.soc_th)) * (
+                    math.exp(soc) - math.exp(self.soc_th)) + self.p_cc
 
 
 class VehicleClass(models.Model):
@@ -67,42 +78,40 @@ class VehicleType(models.Model):
     vehicle_length = models.FloatField()
     vehicle_class = models.ForeignKey(VehicleClass, on_delete=models.CASCADE)
 
-    def charging_curve(self):
+    def charging_curve(self, precision=0.1):
         """
-        :return: pre-computed charging curve
-        A simplified charging curve of Enrico's (5.3), with charging power constant before soc_th and exponentially
-        decrease with time after reaching soc_th
+        :return: pre-computed charging curve, linear estimation of equation (5.3) in the dissertation of E.Lauth
+        Source: eflips.depot.processes.ChargeEquationSteps.estimate_duration() by E.Lauth
         """
 
         soc_min = self.effective_charging_curve.soc_min
         soc_max = self.effective_charging_curve.soc_max
-        soc_th = self.effective_charging_curve.soc_th
-        p_eff = self.effective_charging_curve.p_cc * self.charging_efficiency
         e_eff = self.effective_capacity
 
-        t = np.linspace(0, math.ceil(e_eff * (soc_max - soc_min) / p_eff), num=21)
-        soc = []
+        soc = soc_min
+        dur = 0
+        soc_list = [soc_min, ]
+        time_list = [dur, ]
+        while soc < soc_max:
+            soc_interval = float(min(precision, soc_max - soc))
+            soc += soc_interval
+            soc_list.append(soc)
+            amount = e_eff * soc_interval
 
-        t_th = (soc_th - soc_min) * e_eff / p_eff
+            power = self.effective_charging_curve.get_exponential_power(soc)
+            effective_power = power * self.charging_efficiency
+            dur += amount / effective_power
+            time_list.append(dur)
 
-        for tau in t:
-            if tau <= t_th:
-                soc_tp = p_eff * tau / e_eff + soc_min
-            else:
-                soc_tp = p_eff * math.exp(t_th) * (math.exp(-t_th) - math.exp(-tau)) / e_eff + soc_th
+        return time_list, soc_list
 
-            if soc_tp > soc_max:
-                soc_tp = soc_max
-
-            soc.append(soc_tp)
-
-        return t, soc
-
-    def interpolation(self, t):
+    def interpolation(self, t, precision=0.1):
         """
             will return an soc value by interpolation
         """
-        return np.interp(t, self.charging_curve)
+        time_list, soc_list = self.charging_curve(precision)
+        return np.interp(t, time_list, soc_list, left=self.effective_charging_curve.soc_min,
+                         right=self.effective_charging_curve.soc_max)
 
     def __str__(self):
         """print id and name"""
