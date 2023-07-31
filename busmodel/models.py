@@ -137,14 +137,14 @@ class Trip(models.Model):
 
     trip_id: [int] primary key
     rotation_id: [Rotation] the rotation this trip belongs to
-    departure_station
-    arrival_station
-    departure_time
-    arrival_time
-    distance:
-    temperature
-    incline
-    speed
+    departure_station: [str]
+    arrival_station: [str]
+    departure_time: [DateTimeField]
+    arrival_time: [DateTimeField]
+    distance: [float]
+    temperature: [float]
+    incline: [float]
+    speed: [float]
     """
     trip_id = models.IntegerField(primary_key=True)
     rotation_id = models.ForeignKey(Rotation, on_delete=models.CASCADE)
